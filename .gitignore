@@ -1,2 +1,5 @@
+pipupdate.py
+*.DS_Store
+*.pyc
 Archive
 *.log

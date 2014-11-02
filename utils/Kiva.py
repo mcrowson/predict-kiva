@@ -1,3 +1,8 @@
+'''
+source: https://code.google.com/p/kiva-python/
+
+'''
+
 import urllib2
 import simplejson as json
 from types import *

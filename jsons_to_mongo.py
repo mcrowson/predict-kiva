@@ -13,7 +13,7 @@ Kiva Snapshot Retrieved on 6/23/14
 
 
 #Maybe organize these imports later by their usage?
-import mongodb_proxy
+from utils import mongodb_proxy
 import pymongo
 import simplejson as json
 import os

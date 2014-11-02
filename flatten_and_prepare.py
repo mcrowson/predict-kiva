@@ -18,7 +18,7 @@ Kiva Snapshot retrieved on 6/23/14
 """
 
 import pymongo
-import mongodb_proxy
+from utils import mongodb_proxy
 import collections 
 import multiprocessing
 from datetime import datetime, timedelta

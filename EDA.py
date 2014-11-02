@@ -23,7 +23,7 @@ For boolean variables, have a split between default and delinquency.
 """
 
 import pymongo
-import mongodb_proxy
+from utils import mongodb_proxy
 import logging
 import pandas as pd
 import matplotlib.pyplot as plt

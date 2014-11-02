@@ -15,7 +15,7 @@ And then later, on the prediction server:
 '''
 
 import pymongo
-import mongodb_proxy
+from utils import mongodb_proxy
 import logging
 import pylab as pl
 import pandas as pd
