@@ -86,7 +86,7 @@ if __name__ == '__main__':
     mongo_conn = mongo_connection()
     kiva_db = mongo_conn.db
     #Where did you unzip the JSON zip file?
-    containing_folder = '/Users/matthew/Downloads/kiva_ds_json'
+    containing_folder = '.'
     process_kiva_snapshot_files(containing_folder)
     
     #Create indexes for the checked flag and Kiva's id

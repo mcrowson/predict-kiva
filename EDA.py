@@ -63,7 +63,7 @@ def plt_distribution(var):
         lower_bound = int(math.floor(min([del_loans[var].min(),def_loans[var].min()])))
         upper_bound = int(math.ceil(max([del_loans[var].max(),def_loans[var].max()])))
         binwidth = int(math.ceil((upper_bound - lower_bound)/20))
-        binwidth = 1 if binwidth==0 else binwidth
+        binwidth = 1 if binwidth == 0 else binwidth
         fig = plt.figure()
         ax =  fig.add_axes([0.1, 0.1,0.75, 0.75])
         if del_loans[var].dtype.name == 'float64' or del_loans[var].dtype.name == 'int64':
@@ -99,7 +99,7 @@ def plt_distribution(var):
                  verticalalignment='top', bbox=props)    
         plt.title('%s Distribution' % ' '.join([s.capitalize() for s in var.split('_')]))
         plt.grid(False)
-        path = 'figs/distributions/%s.png' % var
+        path = './figs/distributions/%s.png' % var
         fig.get_figure().savefig(path) 
     except Exception as e:
         log.error('Could not make a dist plot for %(var)s because of %(e)s' % {'var':var,'e':e})
@@ -110,7 +110,7 @@ if __name__ == '__main__':
     flat_loan_collection = kiva_db['flat_loans']
 
     #Make directories for saving images
-    directories = ['figs','figs/distributions','figs/y_scatter', 'figs/y_scatter/defaulted','figs/y_scatter/delinquent']
+    directories = ['./figs','./figs/distributions','./figs/y_scatter', './figs/y_scatter/defaulted','./figs/y_scatter/delinquent']
     for folder in directories:
         if  os.path.isdir(str(os.sep).join([os.getcwd(),folder])) == False:
             os.mkdir(str(os.sep).join([os.getcwd(),folder]))
@@ -163,7 +163,7 @@ if __name__ == '__main__':
     def_loans = loans.ix[loans['defaulted'] == 1]
 
     pool = mp.Pool()
-    pool.map(plt_distribution,loans.keys())  
+    pool.map(plt_distribution, loans.keys())
     pool.close()
     pool.join()
     pool.terminate()
@@ -177,7 +177,7 @@ if __name__ == '__main__':
     plt.ylabel('Pct. of Loan Value in Arrears')
     plt.xticks(xrange(2,11,2),[' '.join([str(i/10),'%']) for i in xrange(20,101,20)])
     plt.ylim(-1.05, 1.05)
-    fig.savefig('figs/del_deciles.png')    
+    fig.savefig('./figs/del_deciles.png')
 
     #Find out which variables have a significant correlation with dollar days late. Make scatterplots
     keys = list()    
@@ -195,7 +195,7 @@ if __name__ == '__main__':
             fig = plt.scatter(del_loans[var],del_loans['dollar_days_late_metric'], alpha=.2) 
             plt.xlabel(var)
             plt.ylabel('dollar_days_late_metric')
-            path = 'figs/y_scatter/delinquent/ddl_scatter_%s.png' % var
+            path = './figs/y_scatter/delinquent/ddl_scatter_%s.png' % var
             fig.get_figure().savefig(path) 
         except:
             log.error('Could not make a scatter plot with %s' % var)
@@ -217,7 +217,7 @@ if __name__ == '__main__':
             fig = plt.scatter(loans[var],loans['defaulted'], alpha=.2)   
             plt.xlabel(var)
             plt.ylabel('Defaulted')
-            path = 'figs/y_scatter/defaulted/def_scatter_%s.png' % var
+            path = './figs/y_scatter/defaulted/def_scatter_%s.png' % var
             fig.get_figure().savefig(path) 
         except:
             log.error('Could not make a scatter plot with %s' % var)

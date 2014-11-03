@@ -178,8 +178,8 @@ if __name__ == '__main__':
               #{'name': 'Nearest Neighbors Regression',
               # 'object': KNeighborsRegressor( n_neighbors=9, p=2, weights='uniform')}, # 9 is Best between 1 and 100
               {'name': 'Random Forest Regressor',
-               'object': RandomForestRegressor(max_depth=None, max_features=0.3, n_estimators=200, n_jobs=-1),
-               'grid': {'min_samples_leaf': range(1, 8, 2)}} #  n_estimators=170, max_features=.3,min_samples_leaf=5,
+               'object': RandomForestRegressor(max_depth=None, max_features=0.3, n_estimators=150, n_jobs=-1),
+               'grid': {'min_samples_leaf': [3, 5, 7]}} #  min_samples_leaf=5,
                ]
 
     #Models had the following R^2 scores on test data
@@ -237,7 +237,7 @@ if __name__ == '__main__':
         ax.text(1.02, 0.92, textstr, fontsize=14, transform=ax.transAxes,
                 verticalalignment='top', bbox=props)
         plt.grid(False)
-        fig.savefig('figs/results/%s.png' % model['name'])
+        fig.savefig('./figs/results/%s.png' % model['name'])
 
 
         #Plot the Residuals
@@ -253,7 +253,7 @@ if __name__ == '__main__':
         ax.text(1.02, 0.92, textstr, fontsize=14, transform=ax.transAxes,
                 verticalalignment='top', bbox=props)
         plt.grid(False)
-        fig.savefig('figs/results/%s_residuals.png' % model['name'])
+        fig.savefig('./figs/results/%s_residuals.png' % model['name'])
 
 
         #Plot the Score as we add observations. Useful for identifying bias and variance, but takes a added time.
@@ -277,7 +277,7 @@ if __name__ == '__main__':
         plt.plot(examples, test_r2, 'b-', label='Test')
         plt.legend()
         plt.grid(False)
-        plt.savefig('figs/results/%s_train_test' % model['name'])
+        plt.savefig('./figs/results/%s_train_test' % model['name'])
         '''
     '''
 
