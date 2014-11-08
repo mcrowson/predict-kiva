@@ -68,11 +68,11 @@ def plt_distribution(var):
         ax =  fig.add_axes([0.1, 0.1,0.75, 0.75])
         if del_loans[var].dtype.name == 'float64' or del_loans[var].dtype.name == 'int64':
             fig = del_loans[var].hist(alpha=.5, color='green', bins=xrange(lower_bound,upper_bound+binwidth,binwidth), weights=np.zeros_like(del_loans[var]) + 1. / del_loans[var].size, label='Repaid')
-            if var != 'dollar_days_late':
+            if var != 'dollar_days_late_metric':
                 def_loans[var].hist(alpha=.5, color='red', bins=xrange(lower_bound,upper_bound+binwidth,binwidth), weights=np.zeros_like(def_loans[var]) + 1. / def_loans[var].size, label='Defaulted')
         if del_loans[var].dtype.name == 'object':
             fig = del_loans[var].plot(kind='bar', alpha=.5, color='green', bins=xrange(lower_bound,upper_bound+binwidth,binwidth), weights=np.zeros_like(del_loans[var]) + 1. / del_loans[var].size, label='Repaid')
-            if var != 'dollar_days_late':
+            if var != 'dollar_days_late_metric':
                 def_loans[var].plot(kind='bar', alpha=.5, color='red', bins=xrange(lower_bound,upper_bound+binwidth,binwidth), weights=np.zeros_like(def_loans[var]) + 1. / def_loans[var].size, label='Defaulted')
         mu = np.average(del_loans[var])
         sigma = np.std(del_loans[var])
@@ -86,7 +86,7 @@ def plt_distribution(var):
         mu = np.average(def_loans[var])
         sigma = np.std(def_loans[var])
 
-        if var != 'dollar_days_late':
+        if var != 'dollar_days_late_metric':
             textstr = 'Defaulted\n$\mu=%.3f$\n$\sigma=%.3f$'%(mu, sigma)
             props = dict(boxstyle='round', facecolor='#990000', alpha=0.5)
             ax.text(1.02, 0.72, textstr, fontsize=14, transform=ax.transAxes,
@@ -180,17 +180,23 @@ if __name__ == '__main__':
     plt.title('Arrears Distribution by Life of Loan')
     plt.xlabel('Life of Loan')
     plt.ylabel('Pct. of Loan Value in Arrears')
-    plt.xticks(xrange(2, 11, 2), [' '.join([str(i/10), '%']) for i in xrange(20, 101, 20)])
-    plt.ylim(-1.05, 1.05)
+    plt.xticks(xrange(2, 11, 2), [' '.join([str(i), '%']) for i in xrange(20, 101, 10)])
+    plt.ylim(-1, 1.05)
     fig.savefig('./figs/del_deciles.png')
 
-    #Find out which variables have a significant correlation with dollar days late. Make scatterplots
-    keys = list()    
+    #Find out which variables have a significant correlation with dollar days late. Make scatter plots
+    keys = list()
+
+    black_list = ['_id',
+                  'activity',
+                  'use']
+
     for k in del_loans.keys():
-        try:
-            keys.append({'var_name':k,'pearson':pearsonr(del_loans['dollar_days_late_metric'],del_loans[k])})
-        except:
-            log.debug('Could not calculate Pearson R for dollar days late and %s' %k)
+        if k not in black_list and 'description' not in k:
+            try:
+                keys.append({'var_name': k, 'pearson': pearsonr(del_loans['dollar_days_late_metric'], del_loans[k])})
+            except:
+                log.debug('Could not calculate Pearson R for dollar days late and %s' %k)
     
     sig_keys = [k for k in keys if k['pearson'][1] < 0.05]
     for var in sig_keys:
@@ -200,6 +206,7 @@ if __name__ == '__main__':
             fig = plt.scatter(del_loans[var],del_loans['dollar_days_late_metric'], alpha=.2) 
             plt.xlabel(var)
             plt.ylabel('dollar_days_late_metric')
+            plt.title('%s Delinquency Scatter Plot' % var)
             path = './figs/y_scatter/delinquent/ddl_scatter_%s.png' % var
             fig.get_figure().savefig(path) 
         except:
@@ -208,10 +215,11 @@ if __name__ == '__main__':
     #Analyze Defaulted Loans with scatterplots as well
     keys = list()
     for k in loans.keys():
-        try:
-            keys.append({'var_name':k,'pearson':pearsonr(loans['defaulted'],loans[k])})
-        except:
-            log.debug('Could not calculate Pearson R for defaulted and %s' %k)
+        if k not in black_list and 'description' not in k:
+            try:
+                keys.append({'var_name':k,'pearson':pearsonr(loans['defaulted'],loans[k])})
+            except:
+                log.debug('Could not calculate Pearson R for defaulted and %s' %k)
             
     sig_keys = [k for k in keys if k['pearson'][1] < 0.05]
     
@@ -222,6 +230,7 @@ if __name__ == '__main__':
             fig = plt.scatter(loans[var], loans['defaulted'], alpha=.2)
             plt.xlabel(var)
             plt.ylabel('Defaulted')
+            plt.title('%s Defaulted Scatter lot' % var)
             path = './figs/y_scatter/defaulted/def_scatter_%s.png' % var
             fig.get_figure().savefig(path) 
         except:
