@@ -7,7 +7,7 @@ Northwestern University's Master of Science in Predictive Analytics. The code is
 partners understand the risk involved with specific loans.
 
 ## Install
-You'll need a few things to run the script. This was built using Python 2.7 and a local instance of Mongo (get verion).
+You'll need a few things to run the script. This was built using Python 2.7 and a local instance of Mongo 2.6.3.
 
 * Download the JSON data snapshot from kiva: http://s3.kiva.org/snapshots/kiva_ds_json.zip
 * Checkout the code: 'git clone git://github.com/mcrowson/predict-kiva.git' 
