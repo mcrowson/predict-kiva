@@ -20,7 +20,7 @@ import math
 
 #Script Logging
 LEVEL = logging.DEBUG
-FORMAT = logging.Formatter('%(asctime)-15s %(name)s %(levelname)-8s %(message)s')
+FORMAT = logging.Formatter('%(asctime)-15s Line %(lineno)s %(name)s %(levelname)-8s %(message)s')
 log = logging.getLogger(__name__)
 log.setLevel(LEVEL)
 fhandler = logging.FileHandler('eda.log')

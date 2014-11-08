@@ -26,7 +26,7 @@ from operator import sub
 
 #Script Logging
 LEVEL = logging.DEBUG
-FORMAT = logging.Formatter('%(asctime)-15s %(name)s %(levelname)-8s %(message)s')
+FORMAT = logging.Formatter('%(asctime)-15s Line %(lineno)s %(name)s %(levelname)-8s %(message)s')
 log = logging.getLogger(__name__)
 log.setLevel(LEVEL)
 fhandler = logging.FileHandler('modeling.log')
@@ -76,8 +76,13 @@ if __name__ == '__main__':
     # Of the 570,343 samples we will use 20%
     sample_size = int(0.02 * 570343)
     c = 0
+    tries = 0
     while c < sample_size:  # Go until we have enough observations for the sample size
-        threshold = np.random.random()
+        tries += 1
+        if tries > 10:
+            threshold = 0
+        else:
+            threshold = np.random.random()
         log.debug('Random value is %s' % threshold)
         cursor = flat_loan_collection.find(dict(random={'$gte': threshold}),
                                            dict(_id=0, journal_totals_bulkEntries=0, journal_totals_entries=0,
@@ -150,8 +155,6 @@ if __name__ == '__main__':
     #Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     reg_models = [{'name': 'Linear Regression',
                    'object': linear_model.LinearRegression()},
-                  {'name': 'Lasso',
-                   'object': linear_model.Lasso(alpha=.0041)},
                   {'name': 'Nearest Neighbors Regression',
                    'object': KNeighborsRegressor(n_neighbors=9, p=2, weights='uniform')},
                   {'name': 'Random Forest Regressor',
@@ -191,16 +194,6 @@ if __name__ == '__main__':
         log.info(' '.join(['Training Data', str(train_score)]))
         log.info(' '.join(['Test Data', str(test_score)]))
 
-        if model['name'] == 'Random Forest Regressor':
-            importances = reg.feature_importances_
-            indices = np.argsort(importances)[::-1]
-
-            # Print the feature ranking
-            log.debug("Feature ranking:")
-
-            for f in range(25):
-                log.info("%d. %s (%f)" % (f + 1, train_x.columns[indices[f]], importances[indices[f]]))
-
         # Plot the Predicted vs Actual
         fig = plt.figure()
         ax = fig.add_axes([0.1, 0.1, 0.75, 0.75])
@@ -230,27 +223,37 @@ if __name__ == '__main__':
         plt.grid(False)
         fig.savefig('./figs/results/%s_residuals.png' % model['name'])
 
-        #Plot the Score as we add observations. Useful for identifying bias and variance, but takes a added time.
-        train_r2 = []
-        test_r2 = []
-        examples = xrange(1000, sample_size, int(sample_size/10))
-        for i in examples:
-            sub_train_x = train_x[:i]
-            sub_train_y = train_y[:i]        
-            reg.fit(sub_train_x, sub_train_y)
-            sub_train_predictions = reg.predict(sub_train_x)
-            sub_train_score = r2_score(sub_train_y, sub_train_predictions)
-            train_r2.append(sub_train_score)
-            predictions = reg.predict(test_x)
-            score = r2_score(test_y, predictions)
-            test_r2.append(score)
-        
-        plt.figure()
-        plt.plot(examples, train_r2, 'r-', label='Train')
-        plt.plot(examples, test_r2, 'b-', label='Test')
-        plt.legend()
-        plt.grid(False)
-        plt.savefig('./figs/results/%s_train_test' % model['name'])
+        if model['name'] == 'Random Forest Regressor':
+            importances = reg.feature_importances_
+            indices = np.argsort(importances)[::-1]
+
+            # Print the feature ranking
+            log.debug("Feature ranking:")
+
+            for f in range(25):
+                log.info("%d. %s (%f)" % (f + 1, train_x.columns[indices[f]], importances[indices[f]]))
+
+            # Plot the Score as we add observations. Useful for identifying bias and variance, but takes added time.
+            train_r2 = []
+            test_r2 = []
+            examples = xrange(1000, sample_size, int(sample_size/10))
+            for i in examples:
+                sub_train_x = train_x[:i]
+                sub_train_y = train_y[:i]
+                reg.fit(sub_train_x, sub_train_y)
+                sub_train_predictions = reg.predict(sub_train_x)
+                sub_train_score = r2_score(sub_train_y, sub_train_predictions)
+                train_r2.append(sub_train_score)
+                predictions = reg.predict(test_x)
+                score = r2_score(test_y, predictions)
+                test_r2.append(score)
+
+            plt.figure()
+            plt.plot(examples, train_r2, 'r-', label='Train')
+            plt.plot(examples, test_r2, 'b-', label='Test')
+            plt.legend()
+            plt.grid(False)
+            plt.savefig('./figs/results/%s_train_test' % model['name'])
 
     # Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     log.info('Beginning Default Classifier Modeling')
@@ -343,7 +346,7 @@ if __name__ == '__main__':
         pl.ylim([0.0, 1.0])
         pl.xlabel('False Positive Rate')
         pl.ylabel('True Positive Rate')
-        pl.title('Receiver operating characteristic example')
+        pl.title('Receiver Operating Curve %s' % model['name'])
         pl.legend(loc="lower right")
         pl.savefig('figs/results/roc_%s.png' % model['name'])
 
