@@ -72,7 +72,8 @@ def plt_distribution(var):
                 def_loans[var].hist(alpha=.5, color='red', bins=xrange(lower_bound,upper_bound+binwidth,binwidth), weights=np.zeros_like(def_loans[var]) + 1. / def_loans[var].size, label='Defaulted')
         if del_loans[var].dtype.name == 'object':
             fig = del_loans[var].plot(kind='bar', alpha=.5, color='green', bins=xrange(lower_bound,upper_bound+binwidth,binwidth), weights=np.zeros_like(del_loans[var]) + 1. / del_loans[var].size, label='Repaid')
-            def_loans[var].plot(kind='bar', alpha=.5, color='red', bins=xrange(lower_bound,upper_bound+binwidth,binwidth), weights=np.zeros_like(def_loans[var]) + 1. / def_loans[var].size, label='Defaulted')
+            if var != 'dollar_days_late':
+                def_loans[var].plot(kind='bar', alpha=.5, color='red', bins=xrange(lower_bound,upper_bound+binwidth,binwidth), weights=np.zeros_like(def_loans[var]) + 1. / def_loans[var].size, label='Defaulted')
         mu = np.average(del_loans[var])
         sigma = np.std(del_loans[var])
         textstr = 'Repaid\n$\mu=%.3f$\n$\sigma=%.3f$'%(mu, sigma) 
@@ -84,19 +85,23 @@ def plt_distribution(var):
         plt.axvline(x=mu + sigma, color='#336600', linewidth=1.0, alpha=.5)
         mu = np.average(def_loans[var])
         sigma = np.std(def_loans[var])
-        textstr = 'Defaulted\n$\mu=%.3f$\n$\sigma=%.3f$'%(mu, sigma)  
-        props = dict(boxstyle='round', facecolor='#990000', alpha=0.5)
-        ax.text(1.02, 0.72, textstr, fontsize=14, transform=ax.transAxes,
-                 verticalalignment='top', bbox=props)        
-        plt.axvline(x=mu, color = '#990000', linewidth=3.0)
-        plt.axvline(x=mu-sigma,color='#990000', linewidth=1.0, alpha=.5)
-        plt.axvline(x=mu+sigma,color='#990000', linewidth=1.0, alpha=.5)
-        #One Way ANOVA Between Defaulted and Repaid
-        f_val, p_val = f_oneway(del_loans[var],def_loans[var])
-        textstr = 'ANOVA\np=%.3f'%(p_val)  
-        props = dict(boxstyle='round', facecolor='white')
-        ax.text(1.02, 0.5, textstr, fontsize=14, transform=ax.transAxes,
-                 verticalalignment='top', bbox=props)    
+
+        if var != 'dollar_days_late':
+            textstr = 'Defaulted\n$\mu=%.3f$\n$\sigma=%.3f$'%(mu, sigma)
+            props = dict(boxstyle='round', facecolor='#990000', alpha=0.5)
+            ax.text(1.02, 0.72, textstr, fontsize=14, transform=ax.transAxes,
+                     verticalalignment='top', bbox=props)
+            plt.axvline(x=mu, color = '#990000', linewidth=3.0)
+            plt.axvline(x=mu-sigma,color='#990000', linewidth=1.0, alpha=.5)
+            plt.axvline(x=mu+sigma,color='#990000', linewidth=1.0, alpha=.5)
+
+            #One Way ANOVA Between Defaulted and Repaid
+            f_val, p_val = f_oneway(del_loans[var],def_loans[var])
+            textstr = 'ANOVA\np=%.3f'%(p_val)
+            props = dict(boxstyle='round', facecolor='white')
+            ax.text(1.02, 0.5, textstr, fontsize=14, transform=ax.transAxes,
+                     verticalalignment='top', bbox=props)
+
         plt.title('%s Distribution' % ' '.join([s.capitalize() for s in var.split('_')]))
         plt.grid(False)
         path = './figs/distributions/%s.png' % var
@@ -121,15 +126,8 @@ if __name__ == '__main__':
     obs_count = flat_loan_collection.find().count()
     def_count = flat_loan_collection.find({'defaulted':1}).count()
     del_count = obs_count - def_count
-    '''    
-    t_score = 2.575
-    margin_of_error = .01
-    sigma_ddl = np.std([l['dollar_days_late_metric'] for l in flat_loan_collection.find({'defaulted':0},{'dollar_days_late_metric':1})])
-    sigma_def = np.std()
-    ss = (pow(t_score,2)*def_prop*del_prop)/pow(margin_of_error,2)
-    sample_size = ss / (1 + ((ss - 1)/obs_count))#Adjust for Finite Population
-    '''    
-    sample_size = (0.05 * obs_count)
+
+
     log.debug('Of the %(obs)i, we had %(def)i default percentage and %(del)i delinquency' % {'obs':obs_count,'def':def_count,'del':del_count})
 
     
@@ -142,11 +140,18 @@ if __name__ == '__main__':
     #    cursor = flat_loan_collection.find({'random': {'$gte': threshold}})
     #    c = cursor.count()
     cursor = flat_loan_collection.find()
-    loans = [l for l in cursor[:int(sample_size)]]
-    log.debug('The sample is %(size)i large with %(def)i defaulted loans' % {'size':len(loans),'def':sum([1 for l in loans if l['defaulted']==1])})    
+
+    #sample_size = (0.05 * obs_count)
+    #loans = [l for l in cursor[:int(sample_size)]]
+
+    loans = list(cursor)
+    log.debug('The sample is %(size)i large with %(def)i defaulted loans'
+              % {'size': len(loans),
+                 'def': sum([1 for l in loans if l['defaulted'] == 1])})
     
     loans = pd.DataFrame(loans)
-    loans.fillna(value=0,inplace=True) 
+    loans.fillna(value=0,inplace=True)
+
     #Remove variables that are populated during the life of the loan or are unhelpful
     remove_vars = ['translator_byline',
                    'translator_image',
@@ -156,7 +161,7 @@ if __name__ == '__main__':
                    'image_id',
                    'video_thumbnailImageId',
                    'video_youtubeId']
-    [loans.drop(var,1,inplace=True) for var in remove_vars]
+    [loans.drop(var ,1, inplace=True) for var in remove_vars]
     log.info(loans.describe())    
     
     del_loans = loans.ix[loans['defaulted'] == 0]
@@ -168,14 +173,14 @@ if __name__ == '__main__':
     pool.join()
     pool.terminate()
 
-    #Arrears distribution by the lift of the loan
+    #Arrears distribution by the life of the loan
     fig = plt.figure()
     del_deciles = ['delinquency_decile_%s' % i for i in xrange(1,11)]
     del_loans.boxplot(column=del_deciles)
     plt.title('Arrears Distribution by Life of Loan')
     plt.xlabel('Life of Loan')
     plt.ylabel('Pct. of Loan Value in Arrears')
-    plt.xticks(xrange(2,11,2),[' '.join([str(i/10),'%']) for i in xrange(20,101,20)])
+    plt.xticks(xrange(2, 11, 2), [' '.join([str(i/10), '%']) for i in xrange(20, 101, 20)])
     plt.ylim(-1.05, 1.05)
     fig.savefig('./figs/del_deciles.png')
 
@@ -214,7 +219,7 @@ if __name__ == '__main__':
         var = var['var_name']
         try:
             plt.figure()
-            fig = plt.scatter(loans[var],loans['defaulted'], alpha=.2)   
+            fig = plt.scatter(loans[var], loans['defaulted'], alpha=.2)
             plt.xlabel(var)
             plt.ylabel('Defaulted')
             path = './figs/y_scatter/defaulted/def_scatter_%s.png' % var
