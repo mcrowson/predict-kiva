@@ -73,16 +73,21 @@ if __name__ == '__main__':
     #Get a random sample of loans
     np.random.seed(8798)
 
-    # Of the 570,343 samples we will use 20%
-    sample_size = int(0.02 * 570343)
+    # Of the 570,342 samples we will use 20%
+    observations = 570342
+    pct = 1.0  # Percent of observations you want btw 0 - 1
+    sample_size = int(pct * observations)
     c = 0
     tries = 0
+    log.debug('Trying to get %i observations' % sample_size)
     while c < sample_size:  # Go until we have enough observations for the sample size
+        cursor = None
         tries += 1
-        if tries > 10:
-            threshold = 0
+        if tries > 10:  # Try up to 10 times to get a random number.
+            threshold = 0.0
         else:
             threshold = np.random.random()
+
         log.debug('Random value is %s' % threshold)
         cursor = flat_loan_collection.find(dict(random={'$gte': threshold}),
                                            dict(_id=0, journal_totals_bulkEntries=0, journal_totals_entries=0,
@@ -96,6 +101,7 @@ if __name__ == '__main__':
                                                 currency_exchange_loss_amount=0, actual_days_to_pay=0),
                                            limit=sample_size)
         c = cursor.count()
+        log.debug('Mongo returned %i loans in the cursor' % c)
 
     loans = list(cursor)
     log.debug(u'The loan collection is taking up {0:s} space'.format(sizeof_fmt(sys.getsizeof(loans))))
@@ -166,7 +172,6 @@ if __name__ == '__main__':
 
     #Models had the following R^2 scores on test data
     # Linear Regression: 0.570571955820
-    # Lasso :            0.565441691494
     # KNN:               0.267601452273
     # Random Forest:     0.720037591000
     for model in reg_models:
