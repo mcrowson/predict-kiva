@@ -2,17 +2,10 @@
 """
 Created on Wed Dec 18 08:17:35 2013
 
-
-I could just see how many other loans are near them for determining geo/urban
-
-I could see how many other lending partners made loans near them to approximate
-access to capital
-
 mongo admin creds:
 admin: root
 
 Kiva Snapshot retrieved on 6/23/14
-
 
 @author: Matthew
 """
@@ -24,7 +17,6 @@ import multiprocessing
 from datetime import datetime, timedelta
 import logging
 import random as ran
-import sys
 
 #Script Logging
 LEVEL = logging.INFO
@@ -87,9 +79,8 @@ def process_loan(loan_counter):
     Processes a single loan
     '''
     loan = loan_collection.find_one({'id': loan_counter})
-    #Create new variabels
- 
-    
+    #Create new variables
+
     #Date Variable Creation
     #Turn date string into date obj : = datetime.strptime(string_var,date_format)
     date_vars = ['posted_date', 'planned_expiration_date', 'funded_date', 'paid_date']
@@ -138,7 +129,7 @@ def process_loan(loan_counter):
     
     #Geo pairs
     loan['location_geo_lat'], loan['location_geo_lon'] =\
-        [float(x) for x in loan['location']['geo'].pop('pairs',' ').split(' ')]
+        [float(x) for x in loan['location']['geo'].pop('pairs', ' ').split(' ')]
            
     #Number of scheduled payments
     loan['scheduled_payment_count'] = len(loan['terms']['scheduled_payments'])
@@ -150,7 +141,7 @@ def process_loan(loan_counter):
     loan['month_loan_received'] = loan['terms']['disbursal_date'].month
     
     #No payment to $0 payment
-    if loan['paid_amount'] is None : loan['paid_amount'] = 0
+    if loan['paid_amount'] is None: loan['paid_amount'] = 0
     loan['loan_amount'] = float(loan['loan_amount'])
         
     #Calculate Dollar-Days Late / loan amount
@@ -161,7 +152,7 @@ def process_loan(loan_counter):
         loan['defaulted'] = 0
         loan['actual_days_to_pay'] = (loan['payments'][-1]['settlement_date'] - loan['terms']['disbursal_date']).days  
         last_act_pmt = loan['payments'][-1]['settlement_date']
-        loan['final_pmt_days_late'] = (last_act_pmt -  last_sched_pmt).days
+        loan['final_pmt_days_late'] = (last_act_pmt - last_sched_pmt).days
         dollar_days_late = float()
         arrears = float()
         last_day = max([last_sched_pmt, last_act_pmt])
@@ -179,22 +170,20 @@ def process_loan(loan_counter):
         
             #See if payments were settled, subtract from amount outstanding
             for pmt in loan['payments']:
-                if pmt['settlement_date'].date() == day.date() : 
+                if pmt['settlement_date'].date() == day.date():
                     arrears -= (pmt['amount'] + pmt['currency_exchange_loss_amount'])
                     log.debug(' '.join([str(pmt['settlement_date']), 'arrears minus', str(pmt['amount'])]))
         
             #Arrears at a decile of repayment
-
             pct_complete = float((day - loan['terms']['disbursal_date']).days) / loan['scheduled_days_to_pay']
-            #log.debug('%(day_minus_disbursed)d divided by %(dayspay)d' % {'day_minus_disbursed':(day - loan['terms']['disbursal_date']).days,'dayspay':loan['scheduled_days_to_pay']})
-            #log.debug('%s percent complete ' % pct_complete)
-            if pct_complete >= float(delinquency_decile/10) and counter <= 10: #Don't track arrears after last scheduled pmt
-                log.debug('%(pct)s is larger than %(dec)s' % {'pct': pct_complete,'dec': float(delinquency_decile/10)})
+            # Don't track arrears after last scheduled pmt
+            if pct_complete >= float(delinquency_decile/10) and counter <= 10:
+                log.debug('%(pct)s is larger than %(dec)s' % {'pct': pct_complete, 'dec': float(delinquency_decile/10)})
                 name = '_'.join(['delinquency_decile', str(counter)])
-                loan[name] = arrears/loan['loan_amount'] #Delinquency Rate
+                loan[name] = arrears/loan['loan_amount']  # Delinquency Rate
                 log.debug('%(count)s: %(arrears)s divided by %(amt)s is %(final)s'
                           % {'count': counter, 'arrears': arrears, 'amt': loan['loan_amount'], 'final': loan[name]})
-                log.debug('%(name)s has value of %(blank)s' % {'name':name,'blank':loan[name]})                
+                log.debug('%(name)s has value of %(blank)s' % {'name': name, 'blank': loan[name]})
                 delinquency_decile += 1 
                 counter += 1
             
@@ -268,7 +257,7 @@ if __name__ == "__main__":
                                                     'terms.scheduled_payments.0': {'$exists': True},
                                                     'id': {'$lte': 725473}})]
                                                     
-    log.info('Found %(count)s loans. Will now flatten and place in the new collection.' % {'count':len(loans)})
+    log.info('Found %(count)s loans. Will now flatten and place in the new collection.' % {'count': len(loans)})
     num_procs = multiprocessing.cpu_count() * 2
     pool = multiprocessing.Pool(processes=num_procs, maxtasksperchild=2)       
     pool.map(process_loan, loans)
@@ -282,4 +271,3 @@ if __name__ == "__main__":
         log.error('Could not create an index on random because of %s' % e)
     
     log.info('Flatten and Prepare Completed')
-

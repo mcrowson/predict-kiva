@@ -32,10 +32,11 @@ shandler.setFormatter(FORMAT)
 log.addHandler(fhandler)
 log.addHandler(shandler)
 
-log.debug('Starting Kiva Script')
+log.debug('Starting Kiva JSON to Mongo Script')
+
 
 class mongo_connection():
-    '''Creates an instance of a connection to the mongo DB'''
+
     def __init__(self):
         self._uri = 'mongodb://app:3knvak3ijs@localhost/kiva'
         try:
@@ -44,12 +45,19 @@ class mongo_connection():
         except:
             log.error('Could not establish a connection to Mongo Client')
 
+
 def json_to_mongo(json_file, collection):
-    '''Takes a JSON file and writes it to the appropriate Mongo collection'''    
+    """
+    Takes a JSON file and writes it to the appropriate MongoDB collection
+    :param json_file: str
+    :param collection:  obj
+    :return True:
+    """
+
     mongo_col = kiva_db[collection]    
-    with open(json_file,'r') as json_data:     
+    with open(json_file, 'r') as json_data:
         with_header = json.load(json_data)
-        list_of_dicts = with_header[collection] #the subdoc with the name of the colleciton
+        list_of_dicts = with_header[collection]  # the subdoc with the name of the collection
     for d in list_of_dicts:
         try:
             mongo_col.insert(d)
@@ -59,19 +67,23 @@ def json_to_mongo(json_file, collection):
     
     
 def process_kiva_snapshot_files(containing_folder):
-    '''Finds all of the json files from the kiva snapshot and
-    writes them to the mongo db'''
+    """
+    Finds all JSON files in the kiva snapshot
+    :param containing_folder: str
+    :return True:
+    """
     
-    collections = {'lenders':[],'loans':[],'loans_lenders':[]}
+    collections = {'lenders': [], 'loans': [], 'loans_lenders': []}
     
     #populate file names    
     for col in collections.keys():
-        path = os.path.join(containing_folder,col)
+        path = os.path.join(containing_folder, col)
         log.debug('Getting files from %s' % path)
-        try: #Try to get folder names matching our collections
+        try:  # Try to get folder names matching our collections
             file_names = [os.path.join(path,f) for f in os.listdir(path) if os.path.isfile(os.path.join(path,f))]
             collections[col] += file_names
-            log.debug('Got %(count)i JSON files in the %(collection)s collection' % {'count':len(file_names),'collection':col})
+            log.debug('Got %(count)i JSON files in the %(collection)s collection' %
+                      {'count': len(file_names), 'collection': col})
         except:
             log.error('Could not get files at location. Folders/files may not exist')
     
@@ -90,6 +102,6 @@ if __name__ == '__main__':
     process_kiva_snapshot_files(containing_folder)
     
     #Create indexes for the checked flag and Kiva's id
-    kiva_db['loans'].ensure_index({'id':1})
+    kiva_db['loans'].ensure_index({'id': 1})
    
     log.handlers = [] #Remove old handlers so we don't have a bunch of 'em

@@ -2,14 +2,6 @@
 '''
 Created on Mon Jul  7 12:46:25 2014
 
-The following is nice for saving and loading models
->>> from sklearn.externals import joblib
->>> joblib.dump(clf, 'my_model.pkl', compress=9)
-And then later, on the prediction server:
-
->>> from sklearn.externals import joblib
->>> model_clone = joblib.load('my_model.pkl')
-
 
 @author: matthew
 '''
@@ -21,18 +13,14 @@ import pylab as pl
 import pandas as pd
 from sklearn import linear_model, grid_search, svm
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
-from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, RandomForestClassifier, AdaBoostClassifier
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
-from sklearn.feature_selection import RFECV
-from sklearn.decomposition import PCA
 from sklearn.metrics import r2_score, f1_score, roc_auc_score, accuracy_score, roc_curve
 from sklearn.feature_extraction import text
 from sklearn.pipeline import Pipeline
 import matplotlib.pylab as plt
 import numpy as np
-import multiprocessing as mp
 import os
-import random as ran
 import sys
 from operator import sub
 
@@ -71,7 +59,7 @@ def sizeof_fmt(num):
     return "%3.1f%s" % (num, 'TB')
             
 if __name__ == '__main__':
-    #Make Directories We will use
+    # Make Directories We will use
     directories = ['figs', 'figs/results']
     for folder in directories:
         if not os.path.isdir(str(os.sep).join([os.getcwd(), folder])):
@@ -80,18 +68,18 @@ if __name__ == '__main__':
     mongo_conn = MongoConnection()
     kiva_db = mongo_conn.db
 
-
     flat_loan_collection = kiva_db['flat_loans']
 
     #Get a random sample of loans
     np.random.seed(8798)
-    threshold = np.random.random()
-    log.debug('Random value is %s' % threshold)
+
     # Of the 570,343 samples we will use 20%
-    sample_size = int(1 * 570343)
+    sample_size = int(0.02 * 570343)
     c = 0
     while c < sample_size:  # Go until we have enough observations for the sample size
-        cursor = flat_loan_collection.find({},  # dict(random={'$gte': threshold})
+        threshold = np.random.random()
+        log.debug('Random value is %s' % threshold)
+        cursor = flat_loan_collection.find(dict(random={'$gte': threshold}),
                                            dict(_id=0, journal_totals_bulkEntries=0, journal_totals_entries=0,
                                                 translator_byline=0, translator_image=0, video_title=0, video_id=0,
                                                 image_template_id=0, image_id=0, paid_amount=0, random=0,
@@ -100,10 +88,11 @@ if __name__ == '__main__':
                                                 delinquency_decile_2=0, delinquency_decile_3=0, delinquency_decile_4=0,
                                                 delinquency_decile_5=0, delinquency_decile_6=0, delinquency_decile_7=0,
                                                 delinquency_decile_8=0, delinquency_decile_9=0,
-                                                currency_exchange_loss_amount=0, actual_days_to_pay=0))
+                                                currency_exchange_loss_amount=0, actual_days_to_pay=0),
+                                           limit=sample_size)
         c = cursor.count()
-        c = sample_size # temporary to get all loans
-    loans = [l for l in cursor[:int(sample_size)]]
+
+    loans = list(cursor)
     log.debug(u'The loan collection is taking up {0:s} space'.format(sizeof_fmt(sys.getsizeof(loans))))
     loans = pd.DataFrame(loans)
     log.debug('The data set contains %(size)i observations with %(def)i defaulted loans'
@@ -120,7 +109,6 @@ if __name__ == '__main__':
     text_df = del_loans.ix[:, text_fields]
     [del_loans.drop(var, 1, inplace=True) for var in text_fields if var != 'id']
 
-
     #Train/Test Split for Delinquent Loans - May want to use cross validation later
     X = del_loans.drop('dollar_days_late_metric', 1)
     Y = del_loans['dollar_days_late_metric']
@@ -130,24 +118,17 @@ if __name__ == '__main__':
     train_x, train_y = X[train_mask], Y[train_mask]
     test_x, test_y = X[~train_mask], Y[~train_mask]
 
-
     train_text_df = text_df[train_mask]
     test_text_df = text_df[~train_mask]
-
 
     # Remove rows with non-numeric data in any field. This hopefully has no effect.
     train_x = train_x[train_x.applymap(lambda x: isinstance(x, (int, float))).all(1)].fillna(value=0)
     test_x = test_x[test_x.applymap(lambda x: isinstance(x, (int, float))).all(1)].fillna(value=0)
     log.debug('Testing and Training data have removed all non int and float rows.')
 
-    '''
-    I'll need to pickle the transformers for future test data.
-    '''
-
-    '''
     # Vectorize text fields and add them back to our training and testing dfs
     for field in text_fields:  # Remove the [:1] when done with testing
-        if field not in [u'activity', u'use']: #We are ignoring description texts for now due to high RAM requirements
+        if field not in [u'activity', u'use']:  # We are ignoring description texts for now due to high RAM requirements
             continue
         log.debug('Creating text vectors for %s' % field)
         vect = text.TfidfVectorizer()
@@ -165,22 +146,20 @@ if __name__ == '__main__':
         test_text_df.drop(field, 1, inplace=True)
 
     log.debug('Text variables vectorized and applied to dataframes.')
-    '''
-
-    #test_x.drop('id', 1, inplace=True)
-    #train_x.drop('id', 1, inplace=True)
 
     #Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
-    reg_models = [#{'name': 'Linear Regression',
-               #'object': linear_model.LinearRegression()},
-              #{'name': 'Lasso',
-              # 'object': linear_model.Lasso(alpha=.0041)}, # Best alpha = 0.0041
-              #{'name': 'Nearest Neighbors Regression',
-              # 'object': KNeighborsRegressor( n_neighbors=9, p=2, weights='uniform')}, # 9 is Best between 1 and 100
-              {'name': 'Random Forest Regressor',
-               'object': RandomForestRegressor(max_depth=None, max_features=0.3, n_estimators=150, n_jobs=-1),
-               'grid': {'min_samples_leaf': [3, 5, 7]}} #  min_samples_leaf=5,
-               ]
+    reg_models = [{'name': 'Linear Regression',
+                   'object': linear_model.LinearRegression()},
+                  {'name': 'Lasso',
+                   'object': linear_model.Lasso(alpha=.0041)},
+                  {'name': 'Nearest Neighbors Regression',
+                   'object': KNeighborsRegressor(n_neighbors=9, p=2, weights='uniform')},
+                  {'name': 'Random Forest Regressor',
+                   'object': RandomForestRegressor(max_depth=None,
+                                                   max_features=0.3,
+                                                   min_samples_leaf=5,
+                                                   n_estimators=150,
+                                                   n_jobs=-1)}]
 
     #Models had the following R^2 scores on test data
     # Linear Regression: 0.570571955820
@@ -212,7 +191,6 @@ if __name__ == '__main__':
         log.info(' '.join(['Training Data', str(train_score)]))
         log.info(' '.join(['Test Data', str(test_score)]))
 
-
         if model['name'] == 'Random Forest Regressor':
             importances = reg.feature_importances_
             indices = np.argsort(importances)[::-1]
@@ -223,9 +201,7 @@ if __name__ == '__main__':
             for f in range(25):
                 log.info("%d. %s (%f)" % (f + 1, train_x.columns[indices[f]], importances[indices[f]]))
 
-
-        '''
-        #Plot the Predicted vs Actual
+        # Plot the Predicted vs Actual
         fig = plt.figure()
         ax = fig.add_axes([0.1, 0.1, 0.75, 0.75])
         plt.scatter(test_y[::50], predictions[::50], alpha=.25)  # Stepping 50 so sample plotting
@@ -238,7 +214,6 @@ if __name__ == '__main__':
                 verticalalignment='top', bbox=props)
         plt.grid(False)
         fig.savefig('./figs/results/%s.png' % model['name'])
-
 
         #Plot the Residuals
         fig = plt.figure()
@@ -255,7 +230,6 @@ if __name__ == '__main__':
         plt.grid(False)
         fig.savefig('./figs/results/%s_residuals.png' % model['name'])
 
-
         #Plot the Score as we add observations. Useful for identifying bias and variance, but takes a added time.
         train_r2 = []
         test_r2 = []
@@ -267,8 +241,7 @@ if __name__ == '__main__':
             sub_train_predictions = reg.predict(sub_train_x)
             sub_train_score = r2_score(sub_train_y, sub_train_predictions)
             train_r2.append(sub_train_score)
-            predicti\
-                    ons = reg.predict(test_x)
+            predictions = reg.predict(test_x)
             score = r2_score(test_y, predictions)
             test_r2.append(score)
         
@@ -278,17 +251,14 @@ if __name__ == '__main__':
         plt.legend()
         plt.grid(False)
         plt.savefig('./figs/results/%s_train_test' % model['name'])
-        '''
-    '''
 
-    #Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
+    # Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     log.info('Beginning Default Classifier Modeling')
 
-
-    #Remove the text fields
+    # Remove the text fields
     [def_loans.drop(var, 1, inplace=True) for var in text_fields if var != 'id']
 
-    #Train/Test Split for Delinquent Loans - May want to use cross validation later
+    # Train/Test Split for Delinquent Loans - May want to use cross validation later
     X = def_loans.drop('defaulted', 1)
     Y = def_loans['defaulted']
     def_loans = None
@@ -306,23 +276,19 @@ if __name__ == '__main__':
     test_x = test_x[test_x.applymap(lambda x: isinstance(x, (int, float))).all(1)].fillna(value=0)
     log.debug('Testing and Training data have removed all non int and float rows.')
 
-
-    test_x.drop('id', 1, inplace=True)
-    train_x.drop('id', 1, inplace=True)
-
-    classifier_models = [
-              #{'name': 'Nearest Neighbors Classifier',
-              # 'object': KNeighborsClassifier()},
-              {'name': 'Random Forest Classifier',
-               'object': RandomForestClassifier(n_jobs=-1)},
-              #{'name': 'Guasian Naive Bayes', 'object': GaussianNB()}
-               ]
+    classifier_models = [{'name': 'Logistic Regression Classifier',
+                          'object': linear_model.LogisticRegression()},
+                         {'name': 'Nearest Neighbors Classifier',
+                          'object': KNeighborsClassifier()},
+                         {'name': 'Random Forest Classifier',
+                          'object': RandomForestClassifier(n_jobs=-1)},
+                         {'name': 'Guasian Naive Bayes', 'object': GaussianNB()}]
 
     #Create Default Models
     for model in classifier_models:
         clf = model['object']
-        #Grid Search for Parameters if Defined in Models Array
 
+        # Grid Search for Parameters if Defined in Models Array
         grid = model.get('grid', None)
         if grid:
             clf = grid_search.GridSearchCV(clf, model['grid'], n_jobs=-1, cv=10)
@@ -354,7 +320,6 @@ if __name__ == '__main__':
             for f in range(25):
                 log.info("%d. %s (%f)" % (f + 1, train_x.columns[indices[f]], importances[indices[f]]))
 
-
         #Plot the Predicted vs Actual
         fig = plt.figure()
         ax = fig.add_axes([0.1, 0.1, 0.75, 0.75])
@@ -369,7 +334,6 @@ if __name__ == '__main__':
         plt.grid(False)
         fig.savefig('figs/results/%s.png' % model['name'])
 
-
         # Plot ROC curve
         pl.clf()
         fpr, tpr, thresholds = roc_curve(test_y, clf.predict_proba(test_x)[:, 1])
@@ -382,11 +346,6 @@ if __name__ == '__main__':
         pl.title('Receiver operating characteristic example')
         pl.legend(loc="lower right")
         pl.savefig('figs/results/roc_%s.png' % model['name'])
-    '''
 
 shandler.close()
 fhandler.close()
-
-'''
-Pickle and save the model to file.
-'''
