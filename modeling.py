@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
     # Of the 570,342 samples we will use 20%
     observations = 570342
-    pct = 0.002  # Percent of observations you want btw 0 - 1
+    pct = 0.2  # Percent of observations you want btw 0 - 1
     sample_size = int(pct * observations)
     c = 0
     tries = 0
@@ -160,7 +160,6 @@ if __name__ == '__main__':
 
     log.debug('Text variables vectorized and applied to dataframes.')
 
-    '''
     #Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     reg_models = [{'name': 'Linear Regression',
                    'object': linear_model.LinearRegression()},
@@ -286,7 +285,7 @@ if __name__ == '__main__':
             plt.grid(False)
             plt.savefig('./figs/results/%s_train_test' % model['name'])
 
-    '''
+
     # Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     log.info('Beginning Default Classifier Modeling')
 
@@ -345,8 +344,9 @@ if __name__ == '__main__':
             clf_tmp = rfecv.estimator_
 
             mask = rfecv.get_support()
+            log.debug('Logistic Regression Feature Estimates')
             for i in xrange(len(train_x.columns[mask])):
-                log.debug(train_x.columns[mask][i], ': ',clf_tmp.coef_[0][i])
+                log.debug(': '.join([train_x.columns[mask][i], str(clf_tmp.coef_[0][i])]))
 
             log.debug("Optimal number of features : %d" % rfecv.n_features_)
 
