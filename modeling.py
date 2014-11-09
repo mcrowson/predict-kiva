@@ -11,12 +11,13 @@ from utils import mongodb_proxy
 import logging
 import pylab as pl
 import pandas as pd
-from sklearn import linear_model, grid_search, svm
+from sklearn import linear_model, grid_search
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
-from sklearn.metrics import r2_score, f1_score, roc_auc_score, accuracy_score, roc_curve
+from sklearn.metrics import r2_score, roc_auc_score, accuracy_score, roc_curve
 from sklearn.feature_extraction import text
+from sklearn.feature_selection import RFECV
 from sklearn.pipeline import Pipeline
 import matplotlib.pylab as plt
 import numpy as np
@@ -75,7 +76,7 @@ if __name__ == '__main__':
 
     # Of the 570,342 samples we will use 20%
     observations = 570342
-    pct = 1.0  # Percent of observations you want btw 0 - 1
+    pct = 0.002  # Percent of observations you want btw 0 - 1
     sample_size = int(pct * observations)
     c = 0
     tries = 0
@@ -145,19 +146,21 @@ if __name__ == '__main__':
         vect = text.TfidfVectorizer()
 
         train_data = vect.fit_transform(train_text_df[field].fillna('')).toarray()
+        train_text_df = train_text_df.drop(field, 1)
         train_df = pd.DataFrame(data=train_data,
                                 columns=['_'.join([field, name]) for name in vect.get_feature_names()])
         train_x = train_x.join(train_df).fillna(value=0)
-        train_text_df.drop(field, 1, inplace=True)
+
 
         test_data = vect.transform(test_text_df[field].fillna('')).toarray()
+        test_text_df = test_text_df.drop(field, 1)
         test_df = pd.DataFrame(data=test_data,
                                columns=['_'.join([field, name]) for name in vect.get_feature_names()])
         test_x = test_x.join(test_df).fillna(value=0)
-        test_text_df.drop(field, 1, inplace=True)
 
     log.debug('Text variables vectorized and applied to dataframes.')
 
+    '''
     #Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     reg_models = [{'name': 'Linear Regression',
                    'object': linear_model.LinearRegression()},
@@ -190,7 +193,27 @@ if __name__ == '__main__':
             log.info(reg.best_estimator_)
         else:
             reg.fit(train_x, train_y)
-        
+
+        if model['name'] == 'Linear Regression':
+            rfecv = RFECV(estimator=reg, step=1, cv=10,
+                          scoring='r2')
+
+            rfecv.fit(train_x, train_y)
+
+            mask = rfecv.get_support()
+            print train_x.columns[mask]
+
+            log.debug("Optimal number of features : %d" % rfecv.n_features_)
+
+            # Plot number of features VS. cross-validation scores
+            plt.figure()
+            plt.title("Optimal number of features: %d" % rfecv.n_features_)
+            plt.xlabel("Number of features selected")
+            plt.ylabel("Cross validation score (nb of correct classifications)")
+            plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_)
+            plt.savefig('./figs/results/%s_feature_selection.png' % model['name'])
+            reg = rfecv
+
         predictions = reg.predict(test_x)
         train_score = r2_score(train_y, reg.predict(train_x))
         test_score = r2_score(test_y, predictions)
@@ -263,6 +286,7 @@ if __name__ == '__main__':
             plt.grid(False)
             plt.savefig('./figs/results/%s_train_test' % model['name'])
 
+    '''
     # Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     log.info('Beginning Default Classifier Modeling')
 
@@ -311,6 +335,29 @@ if __name__ == '__main__':
             log.info(clf.best_estimator_)
         else:
             clf.fit(train_x, train_y)
+
+        if model['name'] == 'Logistic Regression Classifier':
+            # Recurive feature selection with 10-fold cross validation
+            rfecv = RFECV(estimator=clf, step=1, cv=10,
+                          scoring='roc_auc')
+
+            rfecv.fit(train_x, train_y)
+            clf_tmp = rfecv.estimator_
+
+            mask = rfecv.get_support()
+            for i in xrange(len(train_x.columns[mask])):
+                log.debug(train_x.columns[mask][i], ': ',clf_tmp.coef_[0][i])
+
+            log.debug("Optimal number of features : %d" % rfecv.n_features_)
+
+            # Plot number of features VS. cross-validation scores
+            plt.figure()
+            plt.title("Optimal number of features: %d" % rfecv.n_features_)
+            plt.xlabel("Number of features selected")
+            plt.ylabel("Cross validation score (nb of correct classifications)")
+            plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_)
+            plt.savefig('./figs/results/%s_feature_selection.png' % model['name'])
+            clf = rfecv
 
         predictions = clf.predict(test_x)
         train_score = accuracy_score(train_y, clf.predict(train_x))
