@@ -159,6 +159,10 @@ if __name__ == '__main__':
         test_x = test_x.join(test_df).fillna(value=0)
 
     log.debug('Text variables vectorized and applied to dataframes.')
+    log.debug('There are %i columns in the training set' % len(train_x.columns()))
+
+    '''
+
 
     #Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     reg_models = [{'name': 'Linear Regression',
@@ -199,8 +203,12 @@ if __name__ == '__main__':
 
             rfecv.fit(train_x, train_y)
 
+            clf_tmp = rfecv.estimator_
+
             mask = rfecv.get_support()
-            print train_x.columns[mask]
+            log.debug('Linear Regression Feature Estimates')
+            for i in xrange(len(train_x.columns[mask])):
+                log.debug(': '.join([train_x.columns[mask][i], str(clf_tmp.coef_[0][i])]))
 
             log.debug("Optimal number of features : %d" % rfecv.n_features_)
 
@@ -404,6 +412,6 @@ if __name__ == '__main__':
         pl.title('Receiver Operating Curve %s' % model['name'])
         pl.legend(loc="lower right")
         pl.savefig('figs/results/roc_%s.png' % model['name'])
-
+        '''
 shandler.close()
 fhandler.close()

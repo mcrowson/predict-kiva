@@ -43,6 +43,10 @@ class mongo_connection():
             log.error('Could not establish a connection to Mongo Client')
             
 def plt_distribution(var):
+    black_list = ['use', 'activity']
+    if var in black_list or 'description' in var:
+        return  # Don't try to plot text variables
+
     try:
         lower_bound = int(math.floor(min([del_loans[var].min(), def_loans[var].min()])))
         upper_bound = int(math.ceil(max([del_loans[var].max(), def_loans[var].max()])))
@@ -129,16 +133,11 @@ if __name__ == '__main__':
     def_count = flat_loan_collection.find({'defaulted':1}).count()
     del_count = obs_count - def_count
 
-
     log.debug('Of the %(obs)i, we had %(def)i default percentage and %(del)i delinquency' %
-              {'obs': obs_count,'def': def_count,'del': del_count})
+              {'obs': obs_count, 'def': def_count, 'del': del_count})
 
     cursor = flat_loan_collection.find()
     loans = list(cursor)
-
-    log.debug('The sample is %(size)i large with %(def)i defaulted loans'
-              % {'size': len(loans),
-                 'def': sum([1 for l in loans if l['defaulted'] == 1])})
     
     loans = pd.DataFrame(loans)
     loans.fillna(value=0,inplace=True)
@@ -171,7 +170,7 @@ if __name__ == '__main__':
     plt.title('Arrears Distribution by Life of Loan')
     plt.xlabel('Life of Loan')
     plt.ylabel('Pct. of Loan Value in Arrears')
-    plt.xticks(xrange(2, 11, 2), [' '.join([str(i), '%']) for i in xrange(20, 101, 10)])
+    plt.xticks(xrange(1,11), [' '.join([str(i), '%']) for i in xrange(10, 101, 10)])
     plt.ylim(-1, 1.05)
     fig.savefig('./figs/del_deciles.png')
 
@@ -195,9 +194,9 @@ if __name__ == '__main__':
         try:
             plt.figure()
             fig = plt.scatter(del_loans[var], del_loans['dollar_days_late_metric'], alpha=.2)
-            plt.xlabel(var)
-            plt.ylabel('dollar_days_late_metric')
-            plt.title('%s Delinquency Scatter Plot' % var)
+            plt.xlabel(' '.join([s.capitalize() for s in var.split('_')]))
+            plt.ylabel('Dollar Days Late')
+            plt.title('%s Delinquency Scatter Plot' % ' '.join([s.capitalize() for s in var.split('_')]))
             path = './figs/y_scatter/delinquent/ddl_scatter_%s.png' % var
             fig.get_figure().savefig(path) 
         except:
@@ -219,9 +218,9 @@ if __name__ == '__main__':
         try:
             plt.figure()
             fig = plt.scatter(loans[var], loans['defaulted'], alpha=.2)
-            plt.xlabel(var)
+            plt.xlabel(' '.join([s.capitalize() for s in var.split('_')]))
             plt.ylabel('Defaulted')
-            plt.title('%s Defaulted Scatter lot' % var)
+            plt.title('%s Defaulted Scatter Plot' % ' '.join([s.capitalize() for s in var.split('_')]))
             path = './figs/y_scatter/defaulted/def_scatter_%s.png' % var
             fig.get_figure().savefig(path) 
         except:
