@@ -17,8 +17,8 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import r2_score, roc_auc_score, accuracy_score, roc_curve
 from sklearn.feature_extraction import text
-from sklearn.feature_selection import RFECV
-from sklearn.pipeline import Pipeline
+from sklearn.feature_selection import RFE, RFECV
+from sklearn.decomposition import PCA
 import matplotlib.pylab as plt
 import numpy as np
 import os
@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
     # Of the 570,342 samples we will use 20%
     observations = 570342
-    pct = 0.2  # Percent of observations you want btw 0 - 1
+    pct = 0.02  # Percent of observations you want btw 0 - 1
     sample_size = int(pct * observations)
     c = 0
     tries = 0
@@ -161,6 +161,13 @@ if __name__ == '__main__':
     log.debug('Text variables vectorized and applied to dataframes.')
     log.debug('There are %i columns in the training set' % len(train_x.columns))
 
+    # Variable Decomposition
+    pca = PCA(n_components=500)
+    train_x = pca.fit_transform(train_x)
+    test_x = pca.transform(test_x)
+
+    log.debug(pca.explained_variance_ratio_)
+
     #Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     reg_models = [{'name': 'Linear Regression',
                    'object': linear_model.LinearRegression()},
@@ -195,28 +202,30 @@ if __name__ == '__main__':
             reg.fit(train_x, train_y)
 
         if model['name'] == 'Linear Regression':
-            rfecv = RFECV(estimator=reg, step=500, cv=3,
-                          scoring='r2')
+            rfe = RFECV(estimator=reg, cv=3,
+                        scoring='r2')
 
-            rfecv.fit(train_x, train_y)
+            rfe.fit(train_x, train_y)
 
-            clf_tmp = rfecv.estimator_
+            clf_tmp = rfe.estimator_
 
-            mask = rfecv.get_support()
+            ''' # Commented out because PCA removes column names
+            mask = rfe.get_support()
             log.debug('Linear Regression Feature Estimates')
             for i in xrange(len(train_x.columns[mask])):
                 log.debug(': '.join([train_x.columns[mask][i], str(clf_tmp.coef_[0][i])]))
+            '''
 
-            log.debug("Optimal number of features : %d" % rfecv.n_features_)
+            log.debug("Optimal number of features : %d" % rfe.n_features_)
 
             # Plot number of features VS. cross-validation scores
             plt.figure()
-            plt.title("Optimal number of features: %d" % rfecv.n_features_)
+            plt.title("Optimal number of features: %d" % rfe.n_features_)
             plt.xlabel("Number of features selected")
             plt.ylabel("Cross validation score (nb of correct classifications)")
-            plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_)
+            plt.plot(range(1, len(rfe.grid_scores_) + 1), rfe.grid_scores_)
             plt.savefig('./figs/results/%s_feature_selection.png' % model['name'])
-            reg = rfecv
+            reg = rfe
 
         predictions = reg.predict(test_x)
         train_score = r2_score(train_y, reg.predict(train_x))
@@ -229,7 +238,7 @@ if __name__ == '__main__':
         # Plot the Predicted vs Actual
         fig = plt.figure()
         ax = fig.add_axes([0.1, 0.1, 0.75, 0.75])
-        plt.scatter(test_y[::50], predictions[::50], alpha=.25)  # Stepping 50 so sample plotting
+        plt.scatter(test_y, predictions, alpha=.25)  # Stepping 50 so sample plotting
         plt.title(model['name'])
         plt.xlabel('Actual')
         plt.ylabel('Predicted')
@@ -243,8 +252,8 @@ if __name__ == '__main__':
         #Plot the Residuals
         fig = plt.figure()
         ax = fig.add_axes([0.1, 0.1, 0.75, 0.75])
-        residuals = map(sub, test_y[::50], predictions[::50])
-        plt.scatter(test_y[::50], residuals, alpha=.25)  # Stepping 50 so plotting doesn't take so long
+        residuals = map(sub, test_y, predictions)
+        plt.scatter(test_y, residuals, alpha=.25)  # Stepping 50 so plotting doesn't take so long
         plt.title('%s Residuals' % model['name'])
         plt.xlabel('X Value')
         plt.ylabel('Residual')
@@ -255,6 +264,7 @@ if __name__ == '__main__':
         plt.grid(False)
         fig.savefig('./figs/results/%s_residuals.png' % model['name'])
 
+        '''
         if model['name'] == 'Random Forest Regressor':
             importances = reg.feature_importances_
             indices = np.argsort(importances)[::-1]
@@ -264,31 +274,31 @@ if __name__ == '__main__':
 
             for f in range(25):
                 log.info("%d. %s (%f)" % (f + 1, train_x.columns[indices[f]], importances[indices[f]]))
+        '''
+        # Plot the Score as we add observations. Useful for identifying bias and variance, but takes added time.
+        train_r2 = []
+        test_r2 = []
+        examples = xrange(1000, sample_size, int(sample_size/10))
+        for i in examples:
+            sub_train_x = train_x[:i]
+            sub_train_y = train_y[:i]
+            reg.fit(sub_train_x, sub_train_y)
+            sub_train_predictions = reg.predict(sub_train_x)
+            sub_train_score = r2_score(sub_train_y, sub_train_predictions)
+            train_r2.append(sub_train_score)
+            predictions = reg.predict(test_x)
+            score = r2_score(test_y, predictions)
+            test_r2.append(score)
 
-            # Plot the Score as we add observations. Useful for identifying bias and variance, but takes added time.
-            train_r2 = []
-            test_r2 = []
-            examples = xrange(1000, sample_size, int(sample_size/10))
-            for i in examples:
-                sub_train_x = train_x[:i]
-                sub_train_y = train_y[:i]
-                reg.fit(sub_train_x, sub_train_y)
-                sub_train_predictions = reg.predict(sub_train_x)
-                sub_train_score = r2_score(sub_train_y, sub_train_predictions)
-                train_r2.append(sub_train_score)
-                predictions = reg.predict(test_x)
-                score = r2_score(test_y, predictions)
-                test_r2.append(score)
-
-            plt.figure()
-            plt.plot(examples, train_r2, 'r-', label='Train')
-            plt.plot(examples, test_r2, 'b-', label='Test')
-            plt.title('Bias and Variance for Increased Observations')
-            plt.xlabel('Observation Count')
-            plt.ylabel('R2 Score')
-            plt.legend()
-            plt.grid(False)
-            plt.savefig('./figs/results/%s_train_test' % model['name'])
+        plt.figure()
+        plt.plot(examples, train_r2, 'r-', label='Train')
+        plt.plot(examples, test_r2, 'b-', label='Test')
+        plt.title('Bias and Variance for Increased Observations')
+        plt.xlabel('Observation Count')
+        plt.ylabel('R2 Score')
+        plt.legend()
+        plt.grid(False)
+        plt.savefig('./figs/results/%s_train_test' % model['name'])
 
     # Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     log.info('Beginning Default Classifier Modeling')
@@ -385,7 +395,7 @@ if __name__ == '__main__':
         #Plot the Predicted vs Actual
         fig = plt.figure()
         ax = fig.add_axes([0.1, 0.1, 0.75, 0.75])
-        plt.scatter(test_y[::50], predictions[::50], alpha=.25)  # Stepping 50 so sample plotting
+        plt.scatter(test_y, predictions, alpha=.25)  # Stepping 50 so sample plotting
         plt.title(model['name'])
         plt.xlabel('Actual')
         plt.ylabel('Predicted')
