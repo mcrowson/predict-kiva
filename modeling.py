@@ -159,10 +159,7 @@ if __name__ == '__main__':
         test_x = test_x.join(test_df).fillna(value=0)
 
     log.debug('Text variables vectorized and applied to dataframes.')
-    log.debug('There are %i columns in the training set' % len(train_x.columns()))
-
-    '''
-
+    log.debug('There are %i columns in the training set' % len(train_x.columns))
 
     #Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     reg_models = [{'name': 'Linear Regression',
@@ -198,7 +195,7 @@ if __name__ == '__main__':
             reg.fit(train_x, train_y)
 
         if model['name'] == 'Linear Regression':
-            rfecv = RFECV(estimator=reg, step=1, cv=10,
+            rfecv = RFECV(estimator=reg, step=500, cv=3,
                           scoring='r2')
 
             rfecv.fit(train_x, train_y)
@@ -292,7 +289,6 @@ if __name__ == '__main__':
             plt.legend()
             plt.grid(False)
             plt.savefig('./figs/results/%s_train_test' % model['name'])
-
 
     # Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     log.info('Beginning Default Classifier Modeling')
@@ -412,6 +408,6 @@ if __name__ == '__main__':
         pl.title('Receiver Operating Curve %s' % model['name'])
         pl.legend(loc="lower right")
         pl.savefig('figs/results/roc_%s.png' % model['name'])
-        '''
+
 shandler.close()
 fhandler.close()

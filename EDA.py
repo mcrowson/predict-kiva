@@ -92,7 +92,8 @@ def plt_distribution(var):
         mu = np.average(def_loans[var])
         sigma = np.std(def_loans[var])
 
-        if var != 'dollar_days_late_metric':
+        ignore_default = ['dollar_days_late_metric', 'actual_days_to_pay']
+        if var not in ignore_default:
             textstr = 'Defaulted\n$\mu=%.3f$\n$\sigma=%.3f$'%(mu, sigma)
             props = dict(boxstyle='round', facecolor='#990000', alpha=0.5)
             ax.text(1.02, 0.72, textstr, fontsize=14, transform=ax.transAxes,
@@ -170,7 +171,7 @@ if __name__ == '__main__':
     plt.title('Arrears Distribution by Life of Loan')
     plt.xlabel('Life of Loan')
     plt.ylabel('Pct. of Loan Value in Arrears')
-    plt.xticks(xrange(1,11), [' '.join([str(i), '%']) for i in xrange(10, 101, 10)])
+    plt.xticks(xrange(1, 11), [' '.join([str(i), '%']) for i in xrange(10, 101, 10)])
     plt.ylim(-1, 1.05)
     fig.savefig('./figs/del_deciles.png')
 
