@@ -202,7 +202,7 @@ if __name__ == '__main__':
             reg.fit(train_x, train_y)
 
         if model['name'] == 'Linear Regression':
-            rfe = RFECV(estimator=reg, cv=3,
+            rfe = RFECV(estimator=reg, cv=10,
                         scoring='r2')
 
             rfe.fit(train_x, train_y)
@@ -374,9 +374,8 @@ if __name__ == '__main__':
             clf = rfecv
 
         predictions = clf.predict(test_x)
-        train_score = accuracy_score(train_y, clf.predict(train_x))
-        test_score = accuracy_score(test_y, predictions)
-        roc_score = roc_auc_score(test_y, predictions)
+        train_score = roc_auc_score(train_y, clf.predict(train_x))
+        test_score = roc_auc_score(test_y, predictions)
         log.debug(clf.get_params())
         log.info(' '.join([model['name'], 'Performance']))
         log.info(' '.join(['Training Data', str(train_score)]))
@@ -409,7 +408,7 @@ if __name__ == '__main__':
         # Plot ROC curve
         pl.clf()
         fpr, tpr, thresholds = roc_curve(test_y, clf.predict_proba(test_x)[:, 1])
-        pl.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % roc_score)
+        pl.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % test_score)
         pl.plot([0, 1], [0, 1], 'k--')
         pl.xlim([0.0, 1.0])
         pl.ylim([0.0, 1.0])
