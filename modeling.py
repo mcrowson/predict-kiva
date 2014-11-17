@@ -162,10 +162,10 @@ if __name__ == '__main__':
     log.debug('There are %i columns in the training set' % len(train_x.columns))
 
     #Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
-    reg_models = [#{'name': 'Linear Regression',
-                   #'object': linear_model.LinearRegression()},
-                  #{'name': 'Nearest Neighbors Regression',
-                  # 'object': KNeighborsRegressor(n_neighbors=9, p=2, weights='uniform')},
+    reg_models = [{'name': 'Linear Regression',
+                   'object': linear_model.LinearRegression()},
+                  {'name': 'Nearest Neighbors Regression',
+                   'object': KNeighborsRegressor(n_neighbors=9, p=2, weights='uniform')},
                   {'name': 'Random Forest Regressor',
                    'object': RandomForestRegressor(max_depth=None,
                                                    max_features=0.3,

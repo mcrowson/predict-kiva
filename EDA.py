@@ -141,7 +141,7 @@ if __name__ == '__main__':
     loans = list(cursor)
     
     loans = pd.DataFrame(loans)
-    loans.fillna(value=0,inplace=True)
+    loans.fillna(value=0, inplace=True)
 
     #Remove variables that are populated during the life of the loan or are unhelpful
     remove_vars = ['translator_byline',
