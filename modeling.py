@@ -14,11 +14,9 @@ import pandas as pd
 from sklearn import linear_model, grid_search
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.metrics import r2_score, roc_auc_score, accuracy_score, roc_curve
+from sklearn.metrics import r2_score, roc_auc_score, roc_curve
 from sklearn.feature_extraction import text
-from sklearn.feature_selection import RFE, RFECV
-from sklearn.decomposition import PCA
+from sklearn.feature_selection import RFECV
 import matplotlib.pylab as plt
 import numpy as np
 import os
@@ -76,7 +74,7 @@ if __name__ == '__main__':
 
     # Of the 570,342 samples we will use 20%
     observations = 570342
-    pct = 0.02  # Percent of observations you want btw 0 - 1
+    pct = 0.2  # Percent of observations you want btw 0 - 1
     sample_size = int(pct * observations)
     c = 0
     tries = 0
@@ -100,7 +98,8 @@ if __name__ == '__main__':
                                                 delinquency_decile_5=0, delinquency_decile_6=0, delinquency_decile_7=0,
                                                 delinquency_decile_8=0, delinquency_decile_9=0,
                                                 currency_exchange_loss_amount=0, actual_days_to_pay=0),
-                                           limit=sample_size)
+                                           limit=sample_size,
+                                           sort=[('_id', 1)])
         c = cursor.count()
         log.debug('Mongo returned %i loans in the cursor' % c)
 
@@ -159,20 +158,14 @@ if __name__ == '__main__':
         test_x = test_x.join(test_df).fillna(value=0)
 
     log.debug('Text variables vectorized and applied to dataframes.')
+
     log.debug('There are %i columns in the training set' % len(train_x.columns))
 
-    # Variable Decomposition
-    pca = PCA(n_components=500)
-    train_x = pca.fit_transform(train_x)
-    test_x = pca.transform(test_x)
-
-    log.debug(pca.explained_variance_ratio_)
-
     #Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
-    reg_models = [{'name': 'Linear Regression',
-                   'object': linear_model.LinearRegression()},
-                  {'name': 'Nearest Neighbors Regression',
-                   'object': KNeighborsRegressor(n_neighbors=9, p=2, weights='uniform')},
+    reg_models = [#{'name': 'Linear Regression',
+                   #'object': linear_model.LinearRegression()},
+                  #{'name': 'Nearest Neighbors Regression',
+                  # 'object': KNeighborsRegressor(n_neighbors=9, p=2, weights='uniform')},
                   {'name': 'Random Forest Regressor',
                    'object': RandomForestRegressor(max_depth=None,
                                                    max_features=0.3,
@@ -180,10 +173,6 @@ if __name__ == '__main__':
                                                    n_estimators=150,
                                                    n_jobs=-1)}]
 
-    #Models had the following R^2 scores on test data
-    # Linear Regression: 0.570571955820
-    # KNN:               0.267601452273
-    # Random Forest:     0.720037591000
     for model in reg_models:
         reg = model['object']
         #Grid Search for Parameters if Defined in Models Array
@@ -200,32 +189,6 @@ if __name__ == '__main__':
             log.info(reg.best_estimator_)
         else:
             reg.fit(train_x, train_y)
-
-        if model['name'] == 'Linear Regression':
-            rfe = RFECV(estimator=reg, cv=10,
-                        scoring='r2')
-
-            rfe.fit(train_x, train_y)
-
-            clf_tmp = rfe.estimator_
-
-            ''' # Commented out because PCA removes column names
-            mask = rfe.get_support()
-            log.debug('Linear Regression Feature Estimates')
-            for i in xrange(len(train_x.columns[mask])):
-                log.debug(': '.join([train_x.columns[mask][i], str(clf_tmp.coef_[0][i])]))
-            '''
-
-            log.debug("Optimal number of features : %d" % rfe.n_features_)
-
-            # Plot number of features VS. cross-validation scores
-            plt.figure()
-            plt.title("Optimal number of features: %d" % rfe.n_features_)
-            plt.xlabel("Number of features selected")
-            plt.ylabel("Cross validation score (nb of correct classifications)")
-            plt.plot(range(1, len(rfe.grid_scores_) + 1), rfe.grid_scores_)
-            plt.savefig('./figs/results/%s_feature_selection.png' % model['name'])
-            reg = rfe
 
         predictions = reg.predict(test_x)
         train_score = r2_score(train_y, reg.predict(train_x))
@@ -264,7 +227,7 @@ if __name__ == '__main__':
         plt.grid(False)
         fig.savefig('./figs/results/%s_residuals.png' % model['name'])
 
-        '''
+
         if model['name'] == 'Random Forest Regressor':
             importances = reg.feature_importances_
             indices = np.argsort(importances)[::-1]
@@ -274,7 +237,8 @@ if __name__ == '__main__':
 
             for f in range(25):
                 log.info("%d. %s (%f)" % (f + 1, train_x.columns[indices[f]], importances[indices[f]]))
-        '''
+
+
         # Plot the Score as we add observations. Useful for identifying bias and variance, but takes added time.
         train_r2 = []
         test_r2 = []
@@ -329,8 +293,7 @@ if __name__ == '__main__':
                          {'name': 'Nearest Neighbors Classifier',
                           'object': KNeighborsClassifier()},
                          {'name': 'Random Forest Classifier',
-                          'object': RandomForestClassifier(n_jobs=-1)},
-                         {'name': 'Guasian Naive Bayes', 'object': GaussianNB()}]
+                          'object': RandomForestClassifier(n_jobs=-1)}]
 
     #Create Default Models
     for model in classifier_models:
@@ -408,13 +371,13 @@ if __name__ == '__main__':
         # Plot ROC curve
         pl.clf()
         fpr, tpr, thresholds = roc_curve(test_y, clf.predict_proba(test_x)[:, 1])
-        pl.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % test_score)
+        pl.plot(fpr, tpr, label='ROC curve (area = %0.3f)' % test_score)
         pl.plot([0, 1], [0, 1], 'k--')
         pl.xlim([0.0, 1.0])
         pl.ylim([0.0, 1.0])
         pl.xlabel('False Positive Rate')
         pl.ylabel('True Positive Rate')
-        pl.title('Receiver Operating Curve %s' % model['name'])
+        pl.title('Receiver Operating Characteristic %s' % model['name'])
         pl.legend(loc="lower right")
         pl.savefig('figs/results/roc_%s.png' % model['name'])
 
