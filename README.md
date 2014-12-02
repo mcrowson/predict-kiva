@@ -25,4 +25,4 @@ There are four major activities the script takes: load the JSON documents into M
 Depending upon your computer's computing power and RAM, these scripts could take between an hour and a day to run completely. Multiprocessing is used where allowed by Python and the default settings are to use all available cores.
 
 ## Final Models
-The best trained models are pickled and saved in this repo as well. These are scikit-learn objects of RandomForestRegressor and RandomForestClassifier. To predict new kiva loans, new observations must be flattened and prepared prior to using these objects predict method. 
+The best trained models are pickled and saved in this repo as well. These are scikit-learn objects of RandomForestRegressor and LogisticRegressionClassifier. To predict new kiva loans, new observations must be flattened and prepared prior to using these objects predict method. 
