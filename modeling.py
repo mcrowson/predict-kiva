@@ -22,6 +22,7 @@ import numpy as np
 import os
 import sys
 from operator import sub
+import cPickle as pickle
 
 #Script Logging
 LEVEL = logging.DEBUG
@@ -70,7 +71,7 @@ if __name__ == '__main__':
     flat_loan_collection = kiva_db['flat_loans']
 
     #Get a random sample of loans
-    np.random.seed(8798)
+    np.random.seed(87)
 
     # Of the 570,342 samples we will use 20%
     observations = 570342
@@ -118,7 +119,7 @@ if __name__ == '__main__':
     text_fields = [col for col in del_loans.columns.values.tolist() if 'description_texts' in col]
     text_fields += [u'id', u'use', u'activity']
     text_df = del_loans.ix[:, text_fields]
-    [del_loans.drop(var, 1, inplace=True) for var in text_fields if var != 'id']
+    [del_loans.drop(var, 1, inplace=True) for var in text_fields]
 
     #Train/Test Split for Delinquent Loans - May want to use cross validation later
     X = del_loans.drop('dollar_days_late_metric', 1)
@@ -141,15 +142,22 @@ if __name__ == '__main__':
     for field in text_fields:  # Remove the [:1] when done with testing
         if field not in [u'activity', u'use']:  # We are ignoring description texts for now due to high RAM requirements
             continue
-        log.debug('Creating text vectors for %s' % field)
-        vect = text.TfidfVectorizer()
 
-        train_data = vect.fit_transform(train_text_df[field].fillna('')).toarray()
+        if os.path.isfile('pickled_objects/%s_vectorizer' % field):
+            vect = pickle.load(open('pickled_objects/%s_regressor_vectorizer' % field, 'rb'))
+            train_data = vect.transform(train_text_df[field].fillna('')).toarray()
+
+        else:
+            log.debug('Creating text vectors for %s' % field)
+            vect = text.TfidfVectorizer()
+
+            train_data = vect.fit_transform(train_text_df[field].fillna('')).toarray()
+            pickle.dump(vect, open('pickled_objects/%s_regressor_vectorizer' % field, "wb"))
+
         train_text_df = train_text_df.drop(field, 1)
         train_df = pd.DataFrame(data=train_data,
                                 columns=['_'.join([field, name]) for name in vect.get_feature_names()])
         train_x = train_x.join(train_df).fillna(value=0)
-
 
         test_data = vect.transform(test_text_df[field].fillna('')).toarray()
         test_text_df = test_text_df.drop(field, 1)
@@ -162,8 +170,8 @@ if __name__ == '__main__':
     log.debug('There are %i columns in the training set' % len(train_x.columns))
 
     #Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
-    reg_models = [{'name': 'Linear Regression',
-                   'object': linear_model.LinearRegression()},
+    reg_models = [#{'name': 'Linear Regression',
+                  # 'object': linear_model.LinearRegression()},
                   {'name': 'Nearest Neighbors Regression',
                    'object': KNeighborsRegressor(n_neighbors=9, p=2, weights='uniform')},
                   {'name': 'Random Forest Regressor',
@@ -171,24 +179,29 @@ if __name__ == '__main__':
                                                    max_features=0.3,
                                                    min_samples_leaf=5,
                                                    n_estimators=150,
+                                                   random_state=87,
                                                    n_jobs=-1)}]
 
     for model in reg_models:
-        reg = model['object']
-        #Grid Search for Parameters if Defined in Models Array
-
-        grid = model.get('grid', None)
-        if grid:
-            log.debug('Running grid search for optimal settings via 10-fold CV')
-            reg = grid_search.GridSearchCV(reg, model['grid'], n_jobs=-1, cv=10)
-            reg.fit(train_x, train_y)
-            for params, mean_score, scores in reg.grid_scores_:
-                log.debug("%0.3f (+/-%0.03f) for %r" % (
-                    mean_score, scores.std() / 2, params))
-            
-            log.info(reg.best_estimator_)
+        #Get Trained Model from File
+        if os.path.isfile('pickled_objects/%s_regressor' % model['name']):
+            reg = pickle.load(open('pickled_objects/%s_regressor' % model['name'], 'rb'))
         else:
-            reg.fit(train_x, train_y)
+            reg = model['object']
+
+            #Grid Search for Parameters if Defined in Models Array
+            grid = model.get('grid', None)
+            if grid:
+                log.debug('Running grid search for optimal settings via 10-fold CV')
+                reg = grid_search.GridSearchCV(reg, model['grid'], n_jobs=-1, cv=10)
+                reg.fit(train_x, train_y)
+                for params, mean_score, scores in reg.grid_scores_:
+                    log.debug("%0.3f (+/-%0.03f) for %r" % (
+                        mean_score, scores.std() / 2, params))
+
+                log.info(reg.best_estimator_)
+            else:
+                reg.fit(train_x, train_y)
 
         predictions = reg.predict(test_x)
         train_score = r2_score(train_y, reg.predict(train_x))
@@ -229,6 +242,7 @@ if __name__ == '__main__':
 
 
         if model['name'] == 'Random Forest Regressor':
+            pickle.dump(reg, open('pickled_objects/%s_regressor' % model['name'], "wb"))
             importances = reg.feature_importances_
             indices = np.argsort(importances)[::-1]
 
@@ -236,7 +250,7 @@ if __name__ == '__main__':
             log.debug("Feature ranking:")
 
             for f in range(25):
-                log.info("%d. %s (%f)" % (f + 1, train_x.columns[indices[f]], importances[indices[f]]))
+                log.debug("%d. %s (%f)" % (f + 1, train_x.columns[indices[f]], importances[indices[f]]))
 
 
         # Plot the Score as we add observations. Useful for identifying bias and variance, but takes added time.
@@ -268,7 +282,7 @@ if __name__ == '__main__':
     log.info('Beginning Default Classifier Modeling')
 
     # Remove the text fields
-    [def_loans.drop(var, 1, inplace=True) for var in text_fields if var != 'id']
+    [def_loans.drop(var, 1, inplace=True) for var in text_fields]
 
     # Train/Test Split for Delinquent Loans - May want to use cross validation later
     X = def_loans.drop('defaulted', 1)
@@ -288,53 +302,86 @@ if __name__ == '__main__':
     test_x = test_x[test_x.applymap(lambda x: isinstance(x, (int, float))).all(1)].fillna(value=0)
     log.debug('Testing and Training data have removed all non int and float rows.')
 
+    # Vectorize text fields and add them back to our training and testing dfs
+    for field in text_fields:  # Remove the [:1] when done with testing
+        if field not in [u'activity', u'use']:  # We are ignoring description texts for now due to high RAM requirements
+            continue
+
+        if os.path.isfile('pickled_objects/%s_vectorizer' % field):
+            vect = pickle.load(open('pickled_objects/%s_classifier_vectorizer' % field, 'rb'))
+            train_data = vect.transform(train_text_df[field].fillna('')).toarray()
+
+        else:
+            log.debug('Creating text vectors for %s' % field)
+            vect = text.TfidfVectorizer()
+
+            train_data = vect.fit_transform(train_text_df[field].fillna('')).toarray()
+            pickle.dump(vect, open('pickled_objects/%s_classifier_vectorizer' % field, "wb"))
+
+        train_text_df = train_text_df.drop(field, 1)
+        train_df = pd.DataFrame(data=train_data,
+                                columns=['_'.join([field, name]) for name in vect.get_feature_names()])
+        train_x = train_x.join(train_df).fillna(value=0)
+
+        test_data = vect.transform(test_text_df[field].fillna('')).toarray()
+        test_text_df = test_text_df.drop(field, 1)
+        test_df = pd.DataFrame(data=test_data,
+                               columns=['_'.join([field, name]) for name in vect.get_feature_names()])
+        test_x = test_x.join(test_df).fillna(value=0)
+
     classifier_models = [{'name': 'Logistic Regression Classifier',
                           'object': linear_model.LogisticRegression()},
                          {'name': 'Nearest Neighbors Classifier',
                           'object': KNeighborsClassifier()},
                          {'name': 'Random Forest Classifier',
-                          'object': RandomForestClassifier(n_jobs=-1)}]
+                          'object': RandomForestClassifier(random_state=87, n_jobs=-1)}]
 
     #Create Default Models
     for model in classifier_models:
-        clf = model['object']
-
-        # Grid Search for Parameters if Defined in Models Array
-        grid = model.get('grid', None)
-        if grid:
-            clf = grid_search.GridSearchCV(clf, model['grid'], n_jobs=-1, cv=10)
-            clf.fit(train_x, train_y)
-            for params, mean_score, scores in clf.grid_scores_:
-                print "%0.3f (+/-%0.03f) for %r" % (
-                    mean_score, scores.std() / 2, params)
-
-            log.info(clf.best_estimator_)
+        #Get Trained Model from File\
+        if os.path.isfile('pickled_objects/%s_classifier' % model['name']):
+            clf = pickle.load(open('pickled_objects/%s_classifier' % model['name'], 'rb'))
         else:
-            clf.fit(train_x, train_y)
+            clf = model['object']
 
-        if model['name'] == 'Logistic Regression Classifier':
-            # Recurive feature selection with 10-fold cross validation
-            rfecv = RFECV(estimator=clf, step=1, cv=10,
-                          scoring='roc_auc')
+            # Grid Search for Parameters if Defined in Models Array
+            grid = model.get('grid', None)
+            if grid:
+                clf = grid_search.GridSearchCV(clf, model['grid'], n_jobs=-1, cv=10)
+                clf.fit(train_x, train_y)
+                for params, mean_score, scores in clf.grid_scores_:
+                    print "%0.3f (+/-%0.03f) for %r" % (
+                        mean_score, scores.std() / 2, params)
 
-            rfecv.fit(train_x, train_y)
-            clf_tmp = rfecv.estimator_
+                log.info(clf.best_estimator_)
+            else:
+                clf.fit(train_x, train_y)
 
-            mask = rfecv.get_support()
-            log.debug('Logistic Regression Feature Estimates')
-            for i in xrange(len(train_x.columns[mask])):
-                log.debug(': '.join([train_x.columns[mask][i], str(clf_tmp.coef_[0][i])]))
 
-            log.debug("Optimal number of features : %d" % rfecv.n_features_)
+            if model['name'] == 'Logistic Regression Classifier':
+                # Recurive feature selection with 10-fold cross validation
+                rfecv = RFECV(estimator=clf, step=1, cv=10,
+                              scoring='roc_auc')
 
-            # Plot number of features VS. cross-validation scores
-            plt.figure()
-            plt.title("Optimal number of features: %d" % rfecv.n_features_)
-            plt.xlabel("Number of features selected")
-            plt.ylabel("Cross validation score (nb of correct classifications)")
-            plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_)
-            plt.savefig('./figs/results/%s_feature_selection.png' % model['name'])
-            clf = rfecv
+                rfecv.fit(train_x, train_y)
+                clf_tmp = rfecv.estimator_
+
+                mask = rfecv.get_support()
+                log.debug('Logistic Regression Feature Estimates')
+                for i in xrange(len(train_x.columns[mask])):
+                    log.debug(': '.join([train_x.columns[mask][i], str(clf_tmp.coef_[0][i])]))
+
+                log.debug("Optimal number of features : %d" % rfecv.n_features_)
+
+                # Plot number of features VS. cross-validation scores
+                plt.figure()
+                plt.title("Optimal number of features: %d" % rfecv.n_features_)
+                plt.xlabel("Number of features selected")
+                plt.ylabel("Cross validation score (nb of correct classifications)")
+                plt.plot(range(1, len(rfecv.grid_scores_) + 1), rfecv.grid_scores_)
+                plt.savefig('./figs/results/%s_feature_selection.png' % model['name'])
+                clf = rfecv
+                pickle.dump(clf, open('pickled_objects/%s_classifier' % model['name'], "wb"))
 
         predictions = clf.predict(test_x)
         train_score = roc_auc_score(train_y, clf.predict(train_x))
@@ -352,7 +399,7 @@ if __name__ == '__main__':
             log.debug("Feature ranking:")
 
             for f in range(25):
-                log.info("%d. %s (%f)" % (f + 1, train_x.columns[indices[f]], importances[indices[f]]))
+                log.debug("%d. %s (%f)" % (f + 1, train_x.columns[indices[f]], importances[indices[f]]))
 
         #Plot the Predicted vs Actual
         fig = plt.figure()

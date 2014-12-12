@@ -110,6 +110,10 @@ def process_loan(loan_counter):
     #Days to Pay Money
     loan['scheduled_days_to_pay'] = \
         (loan['terms']['scheduled_payments'][-1]['due_date'] - loan['terms']['disbursal_date']).days
+
+    #Days since listed. Measure of recency
+    day_pulled = datetime(2014, 06, 23)
+    loan['recency'] = (day_pulled - loan['posted_date']).days
    
     #Does a Video Exist
     loan['video_exists'] = 1 if loan['video'] is not None else 0
@@ -215,7 +219,8 @@ def process_loan(loan_counter):
                            'name',
                            'location_town',
                            'location_country_code',
-                           '_id']
+                           '_id'
+                           ]
      
     dummy_vars = ['sector',
                   'location_geo_level',
