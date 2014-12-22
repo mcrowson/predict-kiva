@@ -43,6 +43,9 @@ class mongo_connection():
             log.error('Could not establish a connection to Mongo Client')
             
 def plt_distribution(var):
+    path = './figs/distributions/%s.png' % var
+    if os.path.isfile(path):
+        return  # File already exists
     black_list = ['use', 'activity']
     if var in black_list or 'description' in var:
         return  # Don't try to plot text variables
@@ -116,6 +119,41 @@ def plt_distribution(var):
     except Exception as e:
         log.error('Could not make a dist plot for %(var)s because of %(e)s' % {'var': var, 'e': e})
 
+
+def plt_sigvar_regression(var):
+    var = var['var_name']
+    path = './figs/y_scatter/delinquent/ddl_scatter_%s.png' % var
+    if os.path.isfile(path):
+        return  # File already exists
+    try:
+        plt.figure()
+        fig = plt.scatter(del_loans[var], del_loans['dollar_days_late_metric'], alpha=.2)
+        plt.xlabel(' '.join([s.capitalize() for s in var.split('_')]))
+        plt.ylabel('Dollar Days Late')
+        plt.title('%s Delinquency Scatter Plot' % ' '.join([s.capitalize() for s in var.split('_')]))
+        path = './figs/y_scatter/delinquent/ddl_scatter_%s.png' % var
+        fig.get_figure().savefig(path)
+    except:
+        log.error('Could not make a scatter plot with %s' % var)
+    return
+
+def plt_sigvar_classifier(var):
+    var = var['var_name']
+    path = './figs/y_scatter/defaulted/def_scatter_%s.png' % var
+    if os.path.isfile(path):
+        return  # File already exists
+    try:
+        plt.figure()
+        fig = plt.scatter(loans[var], loans['defaulted'], alpha=.2)
+        plt.xlabel(' '.join([s.capitalize() for s in var.split('_')]))
+        plt.ylabel('Defaulted')
+        plt.title('%s Defaulted Scatter Plot' % ' '.join([s.capitalize() for s in var.split('_')]))
+        path = './figs/y_scatter/defaulted/def_scatter_%s.png' % var
+        fig.get_figure().savefig(path)
+    except:
+        log.error('Could not make a scatter plot with %s' % var)
+    return
+
 if __name__ == '__main__':
     mongo_conn = mongo_connection()
     kiva_db = mongo_conn.db     
@@ -134,7 +172,7 @@ if __name__ == '__main__':
     def_count = flat_loan_collection.find({'defaulted':1}).count()
     del_count = obs_count - def_count
 
-    log.debug('Of the %(obs)i, we had %(def)i default percentage and %(del)i delinquency' %
+    log.debug('Of the %(obs)i, we had %(def)i default and %(del)i delinquency' %
               {'obs': obs_count, 'def': def_count, 'del': del_count})
 
     cursor = flat_loan_collection.find()
@@ -190,18 +228,10 @@ if __name__ == '__main__':
                 log.debug('Could not calculate Pearson R for dollar days late and %s' %k)
     
     sig_keys = [k for k in keys if k['pearson'][1] < 0.05]
-    for var in sig_keys:
-        var = var['var_name']
-        try:
-            plt.figure()
-            fig = plt.scatter(del_loans[var], del_loans['dollar_days_late_metric'], alpha=.2)
-            plt.xlabel(' '.join([s.capitalize() for s in var.split('_')]))
-            plt.ylabel('Dollar Days Late')
-            plt.title('%s Delinquency Scatter Plot' % ' '.join([s.capitalize() for s in var.split('_')]))
-            path = './figs/y_scatter/delinquent/ddl_scatter_%s.png' % var
-            fig.get_figure().savefig(path) 
-        except:
-            log.error('Could not make a scatter plot with %s' % var)
+    log.info('Delinquency Significant Keys')
+    log.info(sig_keys)
+
+    map(plt_sigvar_regression, sig_keys)
        
     #Analyze Defaulted Loans with scatter plots as well
     keys = list()
@@ -213,16 +243,7 @@ if __name__ == '__main__':
                 log.debug('Could not calculate Pearson R for defaulted and %s' % k)
             
     sig_keys = [k for k in keys if k['pearson'][1] < 0.05]
-    
-    for var in sig_keys:
-        var = var['var_name']
-        try:
-            plt.figure()
-            fig = plt.scatter(loans[var], loans['defaulted'], alpha=.2)
-            plt.xlabel(' '.join([s.capitalize() for s in var.split('_')]))
-            plt.ylabel('Defaulted')
-            plt.title('%s Defaulted Scatter Plot' % ' '.join([s.capitalize() for s in var.split('_')]))
-            path = './figs/y_scatter/defaulted/def_scatter_%s.png' % var
-            fig.get_figure().savefig(path) 
-        except:
-            log.error('Could not make a scatter plot with %s' % var)
+    log.info('Default Significant Keys')
+    log.info(sig_keys)
+
+    map(plt_sigvar_classifier, sig_keys)

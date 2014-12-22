@@ -143,7 +143,7 @@ if __name__ == '__main__':
         if field not in [u'activity', u'use']:  # We are ignoring description texts for now due to high RAM requirements
             continue
 
-        if os.path.isfile('pickled_objects/%s_vectorizer' % field):
+        if os.path.isfile('pickled_objects/%s__regressorvectorizer' % field):
             vect = pickle.load(open('pickled_objects/%s_regressor_vectorizer' % field, 'rb'))
             train_data = vect.transform(train_text_df[field].fillna('')).toarray()
 
@@ -281,8 +281,13 @@ if __name__ == '__main__':
     # Model Creations If there are parameters set in the grid, they were done so with Cross Validation.
     log.info('Beginning Default Classifier Modeling')
 
-    # Remove the text fields
-    [def_loans.drop(var, 1, inplace=True) for var in text_fields]
+    #Determine the text fields
+    text_fields = [col for col in del_loans.columns.values.tolist() if 'description_texts' in col]
+    text_fields += [u'id', u'use', u'activity']
+
+    # Separate the text
+    text_df = def_loans.ix[:, text_fields]
+    [def_loans.drop(var, 1, inplace=True) for var in text_fields if var != 'id']
 
     # Train/Test Split for Delinquent Loans - May want to use cross validation later
     X = def_loans.drop('defaulted', 1)
@@ -297,44 +302,20 @@ if __name__ == '__main__':
     log.debug('The training set include %i defaulted loans and the test set includes %i defaulted loans'
               % (sum(train_y), sum(test_y)))
 
+    train_text_df = text_df[train_mask]
+    test_text_df = text_df[~train_mask]
+
     # Remove rows with non-numeric data in any rogue field.
     train_x = train_x[train_x.applymap(lambda x: isinstance(x, (int, float))).all(1)].fillna(value=0)
     test_x = test_x[test_x.applymap(lambda x: isinstance(x, (int, float))).all(1)].fillna(value=0)
     log.debug('Testing and Training data have removed all non int and float rows.')
-
-    # Vectorize text fields and add them back to our training and testing dfs
-    for field in text_fields:  # Remove the [:1] when done with testing
-        if field not in [u'activity', u'use']:  # We are ignoring description texts for now due to high RAM requirements
-            continue
-
-        if os.path.isfile('pickled_objects/%s_vectorizer' % field):
-            vect = pickle.load(open('pickled_objects/%s_classifier_vectorizer' % field, 'rb'))
-            train_data = vect.transform(train_text_df[field].fillna('')).toarray()
-
-        else:
-            log.debug('Creating text vectors for %s' % field)
-            vect = text.TfidfVectorizer()
-
-            train_data = vect.fit_transform(train_text_df[field].fillna('')).toarray()
-            pickle.dump(vect, open('pickled_objects/%s_classifier_vectorizer' % field, "wb"))
-
-        train_text_df = train_text_df.drop(field, 1)
-        train_df = pd.DataFrame(data=train_data,
-                                columns=['_'.join([field, name]) for name in vect.get_feature_names()])
-        train_x = train_x.join(train_df).fillna(value=0)
-
-        test_data = vect.transform(test_text_df[field].fillna('')).toarray()
-        test_text_df = test_text_df.drop(field, 1)
-        test_df = pd.DataFrame(data=test_data,
-                               columns=['_'.join([field, name]) for name in vect.get_feature_names()])
-        test_x = test_x.join(test_df).fillna(value=0)
 
     classifier_models = [{'name': 'Logistic Regression Classifier',
                           'object': linear_model.LogisticRegression()},
                          {'name': 'Nearest Neighbors Classifier',
                           'object': KNeighborsClassifier()},
                          {'name': 'Random Forest Classifier',
-                          'object': RandomForestClassifier(random_state=87, n_jobs=-1)}]
+                          'object': RandomForestClassifier(n_estimators=80, random_state=87, n_jobs=-1)}]
 
     #Create Default Models
     for model in classifier_models:
