@@ -25,4 +25,4 @@ There are four major activities the script takes: load the JSON documents into M
 Depending upon your computer's computing power and RAM, these scripts could take between an hour and a day to run completely. Multiprocessing is used where allowed by Python and the default settings are to use all available cores.
 
 ## Final Models
-The best trained models are pickled and saved in this repo as well. These are scikit-learn objects of RandomForestRegressor and LogisticRegressionClassifier. To predict new kiva loans, new observations must be flattened and prepared prior to using these objects predict method. 
+It was my intention to save the final models on this repo. However, their size (severl hundred meg for the random forest models) prevented their inclusion. The modeling script saves the final models to your local directory as pickled objects. These are scikit-learn objects of RandomForestRegressor and LogisticRegressionClassifier. To predict new kiva loans, new observations must be flattened and prepared prior to using these objects predict method. The files can then be unpickled as trained objects. These trained objects can then score the new observations.
